@@ -36,22 +36,30 @@ class InMemoryFeedStore: FeedStore {
     
     private var inMemoryCache: Cache?
     
+    private let queue = DispatchQueue(label: "\(InMemoryFeedStore.self)Queue", qos: .userInitiated, attributes: .concurrent)
+    
     func deleteCachedFeed(completion: @escaping DeletionCompletion) {
-        inMemoryCache = nil
-        completion(nil)
+        queue.async(flags: .barrier) {
+            self.inMemoryCache = nil
+            completion(nil)
+        }
     }
     
     func insert(_ feed: [LocalFeedImage], timestamp: Date, completion: @escaping InsertionCompletion) {
-        let cache = Cache(feed: feed.map(InMemoryFeedImage.init), timestamp: timestamp)
-        inMemoryCache = cache
-        completion(nil)
+        queue.async(flags: .barrier) {
+            let cache = Cache(feed: feed.map(InMemoryFeedImage.init), timestamp: timestamp)
+            self.inMemoryCache = cache
+            completion(nil)
+        }
     }
     
     func retrieve(completion: @escaping RetrievalCompletion) {
-        guard let inMemoryCache = inMemoryCache else {
-            return completion(.empty)
+        queue.async {
+            guard let inMemoryCache = self.inMemoryCache else {
+                return completion(.empty)
+            }
+            completion(.found(feed: inMemoryCache.localFeed, timestamp: inMemoryCache.timestamp))
         }
-        completion(.found(feed: inMemoryCache.localFeed, timestamp: inMemoryCache.timestamp))
     }
 }
 
@@ -136,9 +144,9 @@ class FeedStoreChallengeTests: XCTestCase, FeedStoreSpecs {
 	}
 
 	func test_storeSideEffects_runSerially() {
-//		let sut = makeSUT()
-//
-//		assertThatSideEffectsRunSerially(on: sut)
+		let sut = makeSUT()
+
+		assertThatSideEffectsRunSerially(on: sut)
 	}
 	
 	// - MARK: Helpers
@@ -149,59 +157,3 @@ class FeedStoreChallengeTests: XCTestCase, FeedStoreSpecs {
 	}
 	
 }
-
-//  ***********************
-//
-//  Uncomment the following tests if your implementation has failable operations.
-//
-//  Otherwise, delete the commented out code!
-//
-//  ***********************
-
-//extension FeedStoreChallengeTests: FailableRetrieveFeedStoreSpecs {
-//
-//	func test_retrieve_deliversFailureOnRetrievalError() {
-////		let sut = makeSUT()
-////
-////		assertThatRetrieveDeliversFailureOnRetrievalError(on: sut)
-//	}
-//
-//	func test_retrieve_hasNoSideEffectsOnFailure() {
-////		let sut = makeSUT()
-////
-////		assertThatRetrieveHasNoSideEffectsOnFailure(on: sut)
-//	}
-//
-//}
-
-//extension FeedStoreChallengeTests: FailableInsertFeedStoreSpecs {
-//
-//	func test_insert_deliversErrorOnInsertionError() {
-////		let sut = makeSUT()
-////
-////		assertThatInsertDeliversErrorOnInsertionError(on: sut)
-//	}
-//
-//	func test_insert_hasNoSideEffectsOnInsertionError() {
-////		let sut = makeSUT()
-////
-////		assertThatInsertHasNoSideEffectsOnInsertionError(on: sut)
-//	}
-//
-//}
-
-//extension FeedStoreChallengeTests: FailableDeleteFeedStoreSpecs {
-//
-//	func test_delete_deliversErrorOnDeletionError() {
-////		let sut = makeSUT()
-////
-////		assertThatDeleteDeliversErrorOnDeletionError(on: sut)
-//	}
-//
-//	func test_delete_hasNoSideEffectsOnDeletionError() {
-////		let sut = makeSUT()
-////
-////		assertThatDeleteHasNoSideEffectsOnDeletionError(on: sut)
-//	}
-//
-//}
