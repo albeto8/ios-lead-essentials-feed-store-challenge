@@ -6,12 +6,49 @@ import XCTest
 import FeedStoreChallenge
 
 class InMemoryFeedStore: FeedStore {
+    
+    private struct Cache {
+        let feed: [InMemoryFeedImage]
+        let timestamp: Date
+        
+        var localFeed: [LocalFeedImage] {
+            feed.map({ $0.local })
+        }
+    }
+    
+    private struct InMemoryFeedImage {
+        private let id: UUID
+        private let description: String?
+        private let location: String?
+        private let url: URL
+        
+        init(_ localFeedImage: LocalFeedImage) {
+            self.id = localFeedImage.id
+            self.description = localFeedImage.description
+            self.location = localFeedImage.location
+            self.url = localFeedImage.url
+        }
+        
+        var local: LocalFeedImage {
+            return LocalFeedImage(id: id, description: description, location: location, url: url)
+        }
+    }
+    
+    private var inMemoryCache: Cache?
+    
     func deleteCachedFeed(completion: @escaping DeletionCompletion) { }
     
-    func insert(_ feed: [LocalFeedImage], timestamp: Date, completion: @escaping InsertionCompletion) { }
+    func insert(_ feed: [LocalFeedImage], timestamp: Date, completion: @escaping InsertionCompletion) {
+        let cache = Cache(feed: feed.map(InMemoryFeedImage.init), timestamp: timestamp)
+        inMemoryCache = cache
+        completion(nil)
+    }
     
     func retrieve(completion: @escaping RetrievalCompletion) {
-        completion(.empty)
+        guard let inMemoryCache = inMemoryCache else {
+            return completion(.empty)
+        }
+        completion(.found(feed: inMemoryCache.localFeed, timestamp: inMemoryCache.timestamp))
     }
 }
 
@@ -42,9 +79,9 @@ class FeedStoreChallengeTests: XCTestCase, FeedStoreSpecs {
 	}
 
 	func test_retrieve_deliversFoundValuesOnNonEmptyCache() {
-//		let sut = makeSUT()
-//
-//		assertThatRetrieveDeliversFoundValuesOnNonEmptyCache(on: sut)
+		let sut = makeSUT()
+
+		assertThatRetrieveDeliversFoundValuesOnNonEmptyCache(on: sut)
 	}
 
 	func test_retrieve_hasNoSideEffectsOnNonEmptyCache() {
